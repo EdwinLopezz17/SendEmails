@@ -11,66 +11,52 @@ import base64
 import mimetypes
 
 def embed_images_in_html(html_content, html_file_path):
-    """Busca las imágenes en el HTML y las incrusta como base64"""
     try:
         from bs4 import BeautifulSoup
         soup = BeautifulSoup(html_content, 'html.parser')
-        
-        # Buscar todas las etiquetas <img> que tienen un atributo src
+
         for img in soup.find_all('img'):
             img_src = img['src']
-            if not img_src.startswith('data:'):  # Verificar que no sea ya base64
-                # Obtener la ruta completa de la imagen referenciada
+            if not img_src.startswith('data:'):  
                 img_path = os.path.join(os.path.dirname(html_file_path), img_src)
                 if os.path.exists(img_path):
-                    # Leer la imagen y convertirla a base64
                     with open(img_path, 'rb') as img_file:
                         img_data = img_file.read()
                         img_type, _ = mimetypes.guess_type(img_path)
                         img_base64 = base64.b64encode(img_data).decode('utf-8')
-                        
-                        # Crear el src de la imagen en base64
+
                         img['src'] = f"data:{img_type};base64,{img_base64}"
                 else:
                     logging.warning(f"Imagen no encontrada: {img_path}")
-        
-        # Devolver el HTML con las imágenes incrustadas
+
         return str(soup)
     
     except Exception as e:
         logging.error(f"Error al incrustar imágenes en el HTML: {str(e)}")
         return html_content
 
-
-
-# Configuración de logging para debug
 logging.basicConfig(level=logging.DEBUG, 
                    format='%(asctime)s - %(levelname)s - %(message)s',
                    filename='email_sender.log')
 
 def validate_email(email):
-    """Validar formato de correo electrónico"""
     pattern = r"[^@]+@[^@]+\.[^@]+"
     return re.match(pattern, email)
 
 def load_html_file(html_file):
-    """Leer el archivo HTML, incrustar imágenes y devolver su contenido"""
     try:
         with open(html_file, 'r', encoding='utf-8') as file:
             html_content = file.read()
-        
-        # Incrustar las imágenes en el HTML
+
         html_content = embed_images_in_html(html_content, html_file)
         
         logging.info(f"Archivo HTML leído e imágenes incrustadas correctamente: {html_file}")
         return html_content
     except UnicodeDecodeError:
-        # Si utf-8 falla, intentar con ISO-8859-1
         try:
             with open(html_file, 'r', encoding='iso-8859-1') as file:
                 html_content = file.read()
-            
-            # Incrustar las imágenes en el HTML
+
             html_content = embed_images_in_html(html_content, html_file)
             
             logging.info(f"Archivo HTML leído correctamente con iso-8859-1 e imágenes incrustadas: {html_file}")
@@ -86,7 +72,6 @@ def load_html_file(html_file):
 
 
 def send_emails(sender, password, rows, subject, html_message):
-    """Enviar los correos electrónicos"""
     try:
         smtp = smtplib.SMTP('smtp-mail.outlook.com', port=587)
         smtp.starttls()
@@ -99,14 +84,13 @@ def send_emails(sender, password, rows, subject, html_message):
         for idx, row in enumerate(rows):
             try:
                 recipient_email = row[0]
-                recipient_name = row[1]  # Nombre o correo en caso de estar vacío la columna B
-                cc_emails = row[2:]  # Resto de las columnas son correos en copia (CC)
+                recipient_name = row[1] 
+                cc_emails = row[2:]  
 
                 if not validate_email(recipient_email):
                     logging.warning(f"Email inválido: {recipient_email}")
                     continue
 
-                # Personalizar el mensaje reemplazando @user con el nombre o correo
                 personalized_message = html_message.replace("@user", recipient_name)
 
                 email = MIMEMultipart("alternative")
@@ -116,15 +100,12 @@ def send_emails(sender, password, rows, subject, html_message):
                     email["Cc"] = ", ".join(cc_emails)
                 email["Subject"] = subject
 
-                # Agregar contenido HTML
                 email.attach(MIMEText(personalized_message, "html"))
 
-                # Enviar email
                 all_recipients = [recipient_email] + cc_emails
                 smtp.sendmail(sender, all_recipients, email.as_string())
                 logging.info(f"Email enviado a: {recipient_email}")
-                
-                # Actualizar barra de progreso
+
                 progress['value'] = idx + 1
                 window.update_idletasks()
                 
@@ -140,17 +121,15 @@ def send_emails(sender, password, rows, subject, html_message):
 
 
 def load_rows(excel_file):
-    """Cargar destinatarios desde el archivo Excel"""
     try:
         df = pd.read_excel(excel_file, header=None)
         clean_rows = []
 
         for index, row in df.iterrows():
-            recipient_email = str(row[0]).strip()  # Columna A - Correo de destino
-            recipient_name = str(row[1]).strip() if pd.notna(row[1]) else recipient_email  # Columna B - Nombre o correo
-            cc_emails = [str(email).strip() for email in row[2:] if pd.notna(email)]  # Columna C en adelante - Copias
+            recipient_email = str(row[0]).strip()
+            recipient_name = str(row[1]).strip() if pd.notna(row[1]) else recipient_email
+            cc_emails = [str(email).strip() for email in row[2:] if pd.notna(email)] 
 
-            # Agregar a la lista el correo, nombre y las copias
             clean_rows.append([recipient_email, recipient_name] + cc_emails)
 
         logging.info(f"Filas leídas del Excel: {len(clean_rows)}")
@@ -159,9 +138,7 @@ def load_rows(excel_file):
         logging.error(f"Error en load_rows: {str(e)}")
         raise
 
-
 def select_excel():
-    """Seleccionar archivo Excel"""
     try:
         file = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
         if file:
@@ -172,7 +149,6 @@ def select_excel():
         messagebox.showerror("Error", "Error al seleccionar archivo Excel")
 
 def select_html():
-    """Seleccionar archivo HTML"""
     try:
         file = filedialog.askopenfilename(filetypes=[("HTML Files", "*.htm;*.html")])
         if file:
@@ -183,7 +159,6 @@ def select_html():
         messagebox.showerror("Error", "Error al seleccionar archivo HTML")
 
 def start_send():
-    """Iniciar el envío de correos"""
     try:
         sender = email_entry.get()
         password = password_entry.get()
@@ -211,12 +186,10 @@ def start_send():
         messagebox.showerror("Error", f"Error al iniciar el envío: {str(e)}")
 
 def confirm_send():
-    """Confirmar antes de enviar correos"""
     confirmation = messagebox.askyesno("Confirmar Envío", "¿Estás seguro de que quieres enviar los correos?")
     if confirmation:
         start_send()
 
-# Configuración de la interfaz gráfica
 window = Tk()
 window.title("Mass Email Sender")
 window.geometry("510x470")
